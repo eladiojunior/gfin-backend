@@ -2,36 +2,25 @@ package br.com.devd2.entites;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import io.quarkus.mongodb.panache.common.MongoEntity;
+import org.bson.codecs.pojo.annotations.BsonId;
 
-import org.hibernate.annotations.CreationTimestamp;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.json.bind.annotation.JsonbDateFormat;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 
-@Entity
-@Table(name="TB_HISTORICO_DESPESA_FIXA")
-public class HistoricoDespesaFixaEntity extends PanacheEntityBase {
+@MongoEntity(collection = "tb_historico_despesa_fixa")
+public class HistoricoDespesaFixaEntity extends DocumentoBase {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID_HISTORICO_DESPESA_FIXA")
-    public int id;
+    @BsonId
+    public org.bson.types.ObjectId id;
 
-    @Column(name="ID_DESPESA_FIXA")
-    public int idDespesaFixa;
+    public String idUsuario;
 
-    @Column(name="VL_HISTORICO_DESPESA_FIXA", length = 17, precision = 15, scale = 2)
+    public String idDespesaFixa;
+
     public BigDecimal valorHistoricoDespesaFixa;
 
-    @Column(name="DH_REGISTRO_HISTORICO_DESPESA_FIXA")
-    @CreationTimestamp
     @JsonbDateFormat(value = "yyyy-MM-dd HH:mm:ss")
-    public LocalDateTime dataHoraRegistroHistoricoDespesaFixa;
+    public LocalDateTime dataHoraRegistroHistoricoDespesaFixa = LocalDateTime.now();
 
 }

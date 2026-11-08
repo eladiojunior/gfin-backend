@@ -1,8 +1,8 @@
 package br.com.devd2.enums;
 
 public enum TipoSituacaoEnum {
-    Ativo(1, "Ativo"), 
-    Inativo(2, "Inaivo");
+    Ativo(1, "Ativo"),
+    Inativo(2, "Inativo");
 
     private final int codigo;
     private final String descricao;
@@ -11,11 +11,12 @@ public enum TipoSituacaoEnum {
         this.codigo = codigo;
         this.descricao = descricao;
     }
+
     public int getCodigo() {
         return codigo;
     }
+
     public String getDescricao() {
         return descricao;
     }
-    
 }

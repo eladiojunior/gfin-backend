@@ -1,220 +1,347 @@
 package br.com.devd2.services;
 
+import static br.com.devd2.helper.Identificadores.oid;
+
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import br.com.devd2.entites.CartaoCreditoEntity;
+import br.com.devd2.entites.ContaCorrenteEntity;
 import br.com.devd2.entites.DespesaFixaEntity;
+import br.com.devd2.entites.DespesaMensalEntity;
 import br.com.devd2.entites.HistoricoDespesaFixaEntity;
 import br.com.devd2.entites.NaturezaContaEntity;
-import br.com.devd2.enums.TipoFormaLiquidacaoEnum;
 import br.com.devd2.enums.TipoSituacaoEnum;
 import br.com.devd2.helper.MapperHelper;
 import br.com.devd2.infra.ServiceException;
 import br.com.devd2.models.DespesaFixaEdicaoModel;
 import br.com.devd2.models.DespesaFixaModel;
+import br.com.devd2.models.DespesaMensalEdicaoModel;
+import br.com.devd2.models.DespesaMensalModel;
+import br.com.devd2.models.LiquidacaoDespesaModel;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class DespesaService {
+    @jakarta.inject.Inject FormaLancamentoService formas;
+    @jakarta.inject.Inject ProcessamentoRecorrenteService processamentoRecorrente;
 
-    /**
-     * Lista totas as despesas fixas ativas.
-     * @param hasAtivas - Flag que indica listar apenas ATIVAS.
-     * @return
-     */
-    public List<DespesaFixaModel> listarDespesasFixas(boolean hasAtivas) 
-    {
+    // -------------------------------------------------------------------------
+    // Despesa Fixa
+    // -------------------------------------------------------------------------
 
-        Stream<DespesaFixaEntity> despesasFixas = DespesaFixaEntity
-            .find("codigoTipoSituacaoDespesaFixa = ?1", TipoSituacaoEnum.Ativo.getCodigo()).stream();
-        return despesasFixas.map(m -> MapperHelper.INSTANCE.toDespesaFixaModel(m)).collect(Collectors.toList());
-
+    public List<DespesaFixaModel> listarDespesasFixas(String idUsuario) {
+        return DespesaFixaEntity.<DespesaFixaEntity>find(
+            "codigoTipoSituacaoDespesaFixa = ?1 AND idUsuario = ?2",
+            TipoSituacaoEnum.Ativo.getCodigo(), idUsuario)
+            .stream()
+            .map(MapperHelper.INSTANCE::toDespesaFixaModel)
+            .collect(Collectors.toList());
     }
 
-    /**
-     * Recuperar despesa fixa pelo ID.
-     * @param id - Identificador da despesa fixa.
-     * @return
-     */
-    public DespesaFixaModel obterDespesaFixa(long id) {
-
-        DespesaFixaEntity entity = DespesaFixaEntity.findById(id);
-        return MapperHelper.INSTANCE.toDespesaFixaModel(entity);
-        
-    }
-
-    /**
-     * Registrar uma nova despesa fixa.
-     * @param despesaFixa - Despesa fixa para registro.
-     * @return
-     * @throws ServiceException 
-     */
-    public DespesaFixaModel registrarDespesaFixa(DespesaFixaEdicaoModel despesaFixa) throws ServiceException {
-
-        verificarRegras_DespesaFixa(despesaFixa);
-
-        var entity = MapperHelper.INSTANCE.toDespesaFixaEntity(despesaFixa);
-        entity.codigoTipoSituacaoDespesaFixa = TipoSituacaoEnum.Ativo.getCodigo(); //Ativa
-        entity.persist();
-
-        //Registrar histórico de despesa fixa...
-        var historico = new HistoricoDespesaFixaEntity();
-        historico.idDespesaFixa = entity.id;
-        historico.valorHistoricoDespesaFixa = entity.valorDespesaFixa;
-        historico.persist();
-
-        var model = MapperHelper.INSTANCE.toDespesaFixaModel(entity);
-        return model;
-        
-    }
-
-    /**
-     * Alteração das informações de uma despesa fixa pelo seu ID.
-     * @param id - identificador da despesa fixa.
-     * @param despesaFixa - informações para alteração da despesa fixa.
-     * @param hasGravarHistorico - flag (indicador) que diz se precisa gravar histórico de alteração da despesa fixa.
-     * @return
-     * @throws ServiceException 
-     */
-    public DespesaFixaModel alterarDespesaFixa(long id, DespesaFixaEdicaoModel despesaFixa, boolean hasGravarHistorico) throws ServiceException {
-
-        DespesaFixaEntity entity = DespesaFixaEntity.findById(id);
+    public DespesaFixaModel obterDespesaFixa(String id, String idUsuario) throws ServiceException {
+        DespesaFixaEntity entity = DespesaFixaEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
         if (entity == null) {
             throw new ServiceException("Despesa fixa não identificada pelo ID %s.".formatted(id));
         }
-        
-        //Atualizar a entity com base nas informações enviadas para atualização...
+        return MapperHelper.INSTANCE.toDespesaFixaModel(entity);
+    }
 
-        if (despesaFixa.codigoTipoFormaLiquidacaoDespesaFixa != 0) {
-            if (!TipoFormaLiquidacaoEnum.hasTipoFormaLiquidacao(despesaFixa.codigoTipoFormaLiquidacaoDespesaFixa)) {
-                throw new ServiceException("Tipo Forma Liquidação (%s) não existente.".formatted(despesaFixa.codigoTipoFormaLiquidacaoDespesaFixa));
-            }
-            entity.codigoTipoFormaLiquidacaoDespesaFixa = despesaFixa.codigoTipoFormaLiquidacaoDespesaFixa;
+    public DespesaFixaModel registrarDespesaFixa(DespesaFixaEdicaoModel despesaFixa, String idUsuario) throws ServiceException {
+        verificarRegras_DespesaFixa(despesaFixa, idUsuario);
+        formas.validar(despesaFixa.idFormaLancamento, idUsuario, 1);
+
+        var entity = MapperHelper.INSTANCE.toDespesaFixaEntity(despesaFixa);
+        entity.idUsuario = idUsuario;
+        entity.codigoTipoSituacaoDespesaFixa = TipoSituacaoEnum.Ativo.getCodigo();
+        entity.salvar();
+
+        var historico = new HistoricoDespesaFixaEntity();
+        historico.idUsuario = idUsuario;
+            historico.idDespesaFixa = entity.id.toHexString();
+        historico.valorHistoricoDespesaFixa = entity.valorDespesaFixa;
+        historico.salvar();
+        processamentoRecorrente.processarNovaDespesa(entity);
+
+        return MapperHelper.INSTANCE.toDespesaFixaModel(entity);
+    }
+
+    public DespesaFixaModel alterarDespesaFixa(String id, DespesaFixaEdicaoModel despesaFixa, boolean hasGravarHistorico, String idUsuario) throws ServiceException {
+        DespesaFixaEntity entity = DespesaFixaEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa fixa não identificada pelo ID %s.".formatted(id));
         }
 
+        if (despesaFixa.idFormaLancamento != null) {
+            formas.validar(despesaFixa.idFormaLancamento, idUsuario, 1);
+            entity.idFormaLancamento = despesaFixa.idFormaLancamento;
+        }
         if (despesaFixa.diaVencimentoDespesaFixa != 0) {
-            if (despesaFixa.diaVencimentoDespesaFixa < 1 && despesaFixa.diaVencimentoDespesaFixa > 31) {
-                throw new ServiceException("Dia de vencimento (%s) da despesa fixa inválido.".formatted(despesaFixa.diaVencimentoDespesaFixa));
+            if (despesaFixa.diaVencimentoDespesaFixa < 1 || despesaFixa.diaVencimentoDespesaFixa > 31) {
+                throw new ServiceException("Dia de vencimento (%s) inválido.".formatted(despesaFixa.diaVencimentoDespesaFixa));
             }
             entity.diaVencimentoDespesaFixa = despesaFixa.diaVencimentoDespesaFixa;
         }
-            
-        if (despesaFixa.idNaturezaContaDespesaFixa != 0) {
-            //Verificar se a naturera informada na despesa fixa existe.
-            verificarRegras_NaturezaConta(despesaFixa.idNaturezaContaDespesaFixa);
+        if (despesaFixa.idNaturezaContaDespesaFixa != null) {
+            verificarRegras_NaturezaConta(despesaFixa.idNaturezaContaDespesaFixa, idUsuario);
             entity.idNaturezaContaDespesaFixa = despesaFixa.idNaturezaContaDespesaFixa;
         }
-
         if (despesaFixa.descricaoDespesaFixa != null && !despesaFixa.descricaoDespesaFixa.trim().isEmpty()) {
             entity.descricaoDespesaFixa = despesaFixa.descricaoDespesaFixa;
         }
-        
-        if (despesaFixa.valorDespesaFixa != 0) {
+        if (despesaFixa.valorDespesaFixa > 0) {
             entity.valorDespesaFixa = BigDecimal.valueOf(despesaFixa.valorDespesaFixa);
         }
-    
+
         if (hasGravarHistorico) {
-            //Registrar histórico de despesa fixa...
             var historico = new HistoricoDespesaFixaEntity();
-            historico.idDespesaFixa = entity.id;
+            historico.idUsuario = idUsuario;
+            historico.idDespesaFixa = entity.id.toHexString();
             historico.valorHistoricoDespesaFixa = entity.valorDespesaFixa;
-            historico.persist();
+            historico.salvar();
         }
 
-        entity.persist();
-
-        var model = MapperHelper.INSTANCE.toDespesaFixaModel(entity);
-        return model;
-        
+        entity.salvar();
+        return MapperHelper.INSTANCE.toDespesaFixaModel(entity);
     }
 
-    /**
-     * Verifica se para registro e alteração da despesa fixa, todas as regras foram atendidas.
-     * @param despesa - Objeto para verificação;
-     * @throws ServiceException 
-     */
-    private void verificarRegras_DespesaFixa(DespesaFixaEdicaoModel despesa) throws ServiceException {
-        
+    public void excluirDespesaFixa(String id, String idUsuario) throws ServiceException {
+        DespesaFixaEntity entity = DespesaFixaEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa fixa não identificada pelo ID %s.".formatted(id));
+        }
+
+        boolean semVinculos = semVinculosDespesaFixa(entity);
+        if (semVinculos) {
+            HistoricoDespesaFixaEntity.delete("idDespesaFixa = ?1 and idUsuario = ?2", id, idUsuario);
+            entity.delete();
+        } else {
+            entity.codigoTipoSituacaoDespesaFixa = TipoSituacaoEnum.Inativo.getCodigo();
+            entity.salvar();
+        }
+    }
+
+    private boolean semVinculosDespesaFixa(DespesaFixaEntity despesaFixa) throws ServiceException {
+        if (despesaFixa == null) {
+            throw new ServiceException("Despesa fixa nula, não será possível verificar seus vínculos.");
+        }
+        long count = DespesaMensalEntity.count("idDespesaFixa = ?1 and idUsuario = ?2", despesaFixa.id.toHexString(), despesaFixa.idUsuario);
+        return count == 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // Despesa Mensal
+    // -------------------------------------------------------------------------
+
+    public List<DespesaMensalModel> listarDespesasMensais(int mes, int ano, String idUsuario) {
+        LocalDateTime inicio = LocalDateTime.of(ano, mes, 1, 0, 0, 0);
+        LocalDateTime fim = inicio.plusMonths(1);
+
+        return DespesaMensalEntity.<DespesaMensalEntity>find(
+            "{ 'dataVencimentoDespesa': { '$gte': ?1, '$lt': ?2 }, 'idUsuario': ?3 }",
+            inicio, fim, idUsuario)
+            .stream()
+            .map(MapperHelper.INSTANCE::toDespesaMensalModel)
+            .collect(Collectors.toList());
+    }
+
+    public DespesaMensalModel obterDespesaMensal(String id, String idUsuario) throws ServiceException {
+        DespesaMensalEntity entity = DespesaMensalEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa mensal não identificada pelo ID %s.".formatted(id));
+        }
+        return MapperHelper.INSTANCE.toDespesaMensalModel(entity);
+    }
+
+    public List<DespesaMensalModel> registrarDespesaMensal(DespesaMensalEdicaoModel model, String idUsuario) throws ServiceException {
+        verificarRegras_DespesaMensal(model, idUsuario);
+        verificarVinculo(model.idFormaLancamento, model.codigoVinculoFormaLiquidacao, idUsuario);
+
+        int numeroParcelas = model.numeroParcelas <= 1 ? 1 : model.numeroParcelas;
+        boolean isParcelada = numeroParcelas > 1;
+
+        // Código único para agrupar as parcelas
+        Integer codigoParcelado = isParcelada ? (int) (System.currentTimeMillis() / 1000) : null;
+
+        LocalDateTime dataBase = converterData(model.dataVencimentoDespesa);
+        List<DespesaMensalEntity> geradas = new ArrayList<>();
+
+        for (int i = 1; i <= numeroParcelas; i++) {
+            var entity = new DespesaMensalEntity();
+            entity.idUsuario = idUsuario;
+            entity.idDespesaFixa = model.idDespesaFixa;
+            entity.idNaturezaContaDespesa = model.idNaturezaContaDespesa;
+            entity.hasDespesaParcelada = isParcelada;
+            entity.codigoDespesaParcelada = codigoParcelado;
+            entity.descricaoDespesa = isParcelada
+                ? "%s (%d/%d)".formatted(model.descricaoDespesa, i, numeroParcelas)
+                : model.descricaoDespesa;
+            entity.dataVencimentoDespesa = dataBase.plusMonths(i - 1);
+            entity.valorDespesa = BigDecimal.valueOf(model.valorDespesa);
+            entity.idFormaLancamento = model.idFormaLancamento;
+            entity.codigoVinculoFormaLiquidacao = model.codigoVinculoFormaLiquidacao;
+            entity.textoObservacaoDespesa = model.textoObservacaoDespesa;
+            entity.hasDespesaLiquidada = false;
+            entity.salvar();
+            geradas.add(entity);
+        }
+
+        return geradas.stream()
+            .map(MapperHelper.INSTANCE::toDespesaMensalModel)
+            .collect(Collectors.toList());
+    }
+
+    public DespesaMensalModel alterarDespesaMensal(String id, DespesaMensalEdicaoModel model, String idUsuario) throws ServiceException {
+        DespesaMensalEntity entity = DespesaMensalEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa mensal não identificada pelo ID %s.".formatted(id));
+        }
+        if (entity.hasDespesaLiquidada) {
+            throw new ServiceException("Despesa mensal (ID: %s) já liquidada não pode ser alterada.".formatted(id));
+        }
+
+        if (model.descricaoDespesa != null && !model.descricaoDespesa.trim().isEmpty()) {
+            entity.descricaoDespesa = model.descricaoDespesa;
+        }
+        if (model.dataVencimentoDespesa != null && !model.dataVencimentoDespesa.trim().isEmpty()) {
+            entity.dataVencimentoDespesa = converterData(model.dataVencimentoDespesa);
+        }
+        if (model.valorDespesa > 0) {
+            entity.valorDespesa = BigDecimal.valueOf(model.valorDespesa);
+        }
+        if (model.idFormaLancamento != null) {
+            formas.validar(model.idFormaLancamento, idUsuario, 1);
+            entity.idFormaLancamento = model.idFormaLancamento;
+        }
+        if (model.idNaturezaContaDespesa != null) {
+            verificarRegras_NaturezaConta(model.idNaturezaContaDespesa, idUsuario);
+            entity.idNaturezaContaDespesa = model.idNaturezaContaDespesa;
+        }
+        if (model.textoObservacaoDespesa != null) {
+            entity.textoObservacaoDespesa = model.textoObservacaoDespesa;
+        }
+        verificarVinculo(entity.idFormaLancamento, model.codigoVinculoFormaLiquidacao, idUsuario);
+        entity.codigoVinculoFormaLiquidacao = model.codigoVinculoFormaLiquidacao;
+
+        entity.salvar();
+        return MapperHelper.INSTANCE.toDespesaMensalModel(entity);
+    }
+
+    public DespesaMensalModel liquidarDespesaMensal(String id, LiquidacaoDespesaModel liquidacao, String idUsuario) throws ServiceException {
+        DespesaMensalEntity entity = DespesaMensalEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa mensal não identificada pelo ID %s.".formatted(id));
+        }
+        if (entity.hasDespesaLiquidada) {
+            throw new ServiceException("Despesa mensal (ID: %s) já está liquidada.".formatted(id));
+        }
+        formas.validar(liquidacao.idFormaLancamento, idUsuario, 1);
+
+        verificarVinculo(liquidacao.idFormaLancamento, liquidacao.codigoVinculoFormaLiquidacao, idUsuario);
+        entity.hasDespesaLiquidada = true;
+        entity.dataHoraLiquidacaoDespesa = LocalDateTime.now();
+        entity.idFormaLancamento = liquidacao.idFormaLancamento;
+        entity.codigoVinculoFormaLiquidacao = liquidacao.codigoVinculoFormaLiquidacao;
+
+        BigDecimal desconto = BigDecimal.valueOf(liquidacao.valorDesconto);
+        BigDecimal multaJuros = BigDecimal.valueOf(liquidacao.valorMultaJuros);
+        entity.valorDescontoLiquidacaoDespesa = desconto;
+        entity.valorMultaJurosLiquidacaoDespesa = multaJuros;
+        entity.valorTotalLiquidacaoDespesa = entity.valorDespesa.subtract(desconto).add(multaJuros);
+
+        entity.salvar();
+        return MapperHelper.INSTANCE.toDespesaMensalModel(entity);
+    }
+
+    public void excluirDespesaMensal(String id, String idUsuario) throws ServiceException {
+        DespesaMensalEntity entity = DespesaMensalEntity.find("{ \'_id\': ?1, \'idUsuario\': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) {
+            throw new ServiceException("Despesa mensal não identificada pelo ID %s.".formatted(id));
+        }
+        if (entity.hasDespesaLiquidada) {
+            throw new ServiceException("Despesa mensal (ID: %s) já liquidada não pode ser excluída.".formatted(id));
+        }
+        entity.delete();
+    }
+
+    // -------------------------------------------------------------------------
+    // Validações internas
+    // -------------------------------------------------------------------------
+
+    private void verificarRegras_DespesaFixa(DespesaFixaEdicaoModel despesa, String idUsuario) throws ServiceException {
         if (despesa == null) {
-            throw new ServiceException("Despesa Fixa informada nula.");
+            throw new ServiceException("Despesa fixa informada nula.");
         }
         if (despesa.descricaoDespesaFixa == null || despesa.descricaoDespesaFixa.trim().isEmpty()) {
-            throw new ServiceException("Descrição da despesa fixa mensal não informada.");
+            throw new ServiceException("Descrição da despesa fixa não informada.");
         }
         if (despesa.diaVencimentoDespesaFixa == 0) {
             throw new ServiceException("Dia de vencimento da despesa fixa não informado.");
         }
-        if (despesa.diaVencimentoDespesaFixa < 1 && despesa.diaVencimentoDespesaFixa > 31) {
-            throw new ServiceException("Dia de vencimento (%s) da despesa fixa inválido.".formatted(despesa.diaVencimentoDespesaFixa));
+        if (despesa.diaVencimentoDespesaFixa < 1 || despesa.diaVencimentoDespesaFixa > 31) {
+            throw new ServiceException("Dia de vencimento (%s) inválido.".formatted(despesa.diaVencimentoDespesaFixa));
         }
-        if (despesa.idNaturezaContaDespesaFixa == 0) {
+        if (despesa.idNaturezaContaDespesaFixa == null) {
             throw new ServiceException("Natureza da despesa fixa não informada.");
         }
         if (despesa.valorDespesaFixa <= 0) {
             throw new ServiceException("Valor da despesa fixa não informado ou negativo.");
         }
-
-        //Verificar se a naturera informada na despesa fixa existe.
-        verificarRegras_NaturezaConta(despesa.idNaturezaContaDespesaFixa);
-
+        verificarRegras_NaturezaConta(despesa.idNaturezaContaDespesaFixa, idUsuario);
     }
 
-    /**
-     * Verificar a regra de Natureza de conta existente ou ativa.
-     * @param idNaturezaConta - Identificação da natureza de conta.
-     * @throws ServiceException
-     */
-    private void verificarRegras_NaturezaConta(int idNaturezaConta) throws ServiceException {
+    private void verificarRegras_DespesaMensal(DespesaMensalEdicaoModel model, String idUsuario) throws ServiceException {
+        if (model == null) {
+            throw new ServiceException("Despesa mensal informada nula.");
+        }
+        if (model.descricaoDespesa == null || model.descricaoDespesa.trim().isEmpty()) {
+            throw new ServiceException("Descrição da despesa não informada.");
+        }
+        if (model.valorDespesa <= 0) {
+            throw new ServiceException("Valor da despesa não informado ou negativo.");
+        }
+        if (model.dataVencimentoDespesa == null || model.dataVencimentoDespesa.trim().isEmpty()) {
+            throw new ServiceException("Data de vencimento da despesa não informada.");
+        }
+        formas.validar(model.idFormaLancamento, idUsuario, 1);
+        if (model.numeroParcelas < 0) {
+            throw new ServiceException("Número de parcelas inválido.");
+        }
+        verificarRegras_NaturezaConta(model.idNaturezaContaDespesa, idUsuario);
 
-        NaturezaContaEntity naturezaEntity = NaturezaContaEntity.findById(idNaturezaConta);
+        if (model.idDespesaFixa != null) {
+            DespesaFixaEntity df = DespesaFixaEntity.find("{ '_id': ?1, 'idUsuario': ?2 }", oid(model.idDespesaFixa), idUsuario).firstResult();
+            if (df == null) {
+                throw new ServiceException("Despesa fixa vinculada (ID: %s) não encontrada.".formatted(model.idDespesaFixa));
+            }
+        }
+    }
+
+    private void verificarRegras_NaturezaConta(String idNaturezaConta, String idUsuario) throws ServiceException {
+        NaturezaContaEntity naturezaEntity = NaturezaContaEntity.find("{ '_id': ?1, 'idUsuario': ?2 }", oid(idNaturezaConta), idUsuario).firstResult();
         if (naturezaEntity == null) {
-            throw new ServiceException("Natureza da Despesa Fixa (Id: %s) não existe ou está inativa.".formatted(idNaturezaConta));
-        } else if (naturezaEntity.codigoTipoSituacaoNaturezaConta == TipoSituacaoEnum.Inativo.getCodigo()) {
-            throw new ServiceException("Natureza de conta (Id: %s) está inativa não pode ser utilizada.".formatted(idNaturezaConta));
+            throw new ServiceException("Natureza de conta (ID: %s) não existe.".formatted(idNaturezaConta));
         }
-
+        if (naturezaEntity.codigoTipoSituacaoNaturezaConta == TipoSituacaoEnum.Inativo.getCodigo()) {
+            throw new ServiceException("Natureza de conta (ID: %s) está inativa.".formatted(idNaturezaConta));
+        }
     }
 
-    /**
-     * Exclusão de uma despesa fixa pelo seu ID, pode ser lógica, ser existir algum vínculo com as despesas mensais, 
-     * caso não existe vínculo será uma exclusão física mesmo.
-     * @param id - identificador da despesa fixa.
-     * @return
-     * @throws ServiceException 
-     */
-    public void excluirDespesaFixa(long id) throws ServiceException {
-
-        DespesaFixaEntity entity = DespesaFixaEntity.findById(id);
-        if (entity == null)
-            throw new ServiceException("Despesa fixa não identificada pelo ID %s.".formatted(id));
-
-        //Verificar se a despesas possuí vínculos para evitar exclusão física.
-        var hasExclusaoFisica = verificarVinculosDespesaFixa(entity);
-        if (hasExclusaoFisica) {
-            HistoricoDespesaFixaEntity.delete("idDespesaFixa = ?1", id);
-            entity.delete();
-        } else {
-            entity.codigoTipoSituacaoDespesaFixa = TipoSituacaoEnum.Inativo.getCodigo();
-            entity.persist();
-        }
-
+    private void verificarVinculo(String forma, String id, String idUsuario) throws ServiceException {
+        if (id == null) return;
+        boolean valido = CartaoCreditoEntity.count("{ '_id': ?1, 'idUsuario': ?2 }", oid(id), idUsuario) > 0
+            || ContaCorrenteEntity.count("{ '_id': ?1, 'idUsuario': ?2 }", oid(id), idUsuario) > 0;
+        if (!valido) throw new ServiceException("Vinculo de liquidacao nao encontrado.");
     }
 
-    /**
-     * Verifica se existem vínculos com a despesa fixa.
-     * @param despesaFixa - Despesa fixa carregada.
-     * @return
-     * @throws ServiceException 
-     */
-    private boolean verificarVinculosDespesaFixa(DespesaFixaEntity despesaFixa) throws ServiceException {
-        
-        if (despesaFixa == null) {
-            throw new ServiceException("Despesa fixa nula, não será possível verificar seus vínculos.");
+    private LocalDateTime converterData(String data) throws ServiceException {
+        try {
+            return LocalDateTime.parse(data + "T00:00:00");
+        } catch (Exception e) {
+            throw new ServiceException("Data '%s' inválida. Use o formato yyyy-MM-dd.".formatted(data));
         }
-        
-        return false;
     }
-
 }

@@ -1,0 +1,32 @@
+package br.com.devd2;
+
+import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Test;
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+@QuarkusTest
+class SegurancaApiTest {
+    @Test void cadastroELoginSaoPublicos() {
+        given().contentType("application/json").body("{}").when()
+                .post("/api/v1/usuarios").then().statusCode(400);
+        given().contentType("application/json").body("{}").when()
+                .post("/api/v1/auth/login").then().statusCode(400);
+    }
+
+    @Test void demaisRecursosExigemAutenticacao() {
+        for (String caminho : new String[]{"/usuarios", "/usuarios/1", "/natureza-conta", "/correntistas", "/contas-correntes", "/cartoes", "/despesas/fixas", "/receitas/fixas"}) {
+            given().when().get("/api/v1" + caminho).then().statusCode(401);
+        }
+        given().contentType("application/json").body("{}").when()
+                .put("/api/v1/usuarios/1").then().statusCode(401);
+        given().when().delete("/api/v1/usuarios/1").then().statusCode(401);
+    }
+
+    @Test void openApiDistingueCadastroPublico() {
+        given().accept("application/json").when().get("/q/openapi?format=json").then()
+                .statusCode(200)
+                .body("paths.'/api/v1/usuarios'.post.security", anyOf(nullValue(), empty()))
+                .body("paths.'/api/v1/usuarios'.get.security[0].bearerAuth", notNullValue());
+    }
+}

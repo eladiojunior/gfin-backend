@@ -1,18 +1,20 @@
 package br.com.devd2.services;
 
+import static br.com.devd2.helper.Identificadores.oid;
+
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import br.com.devd2.entites.NaturezaContaEntity;
-import br.com.devd2.entites.DespesaFixaEntity;
-import br.com.devd2.entites.DespesaMensalEntity;
+import br.com.devd2.entites.*;
 import br.com.devd2.enums.TipoLancamentoEnum;
 import br.com.devd2.enums.TipoSituacaoEnum;
 import br.com.devd2.helper.MapperHelper;
 import br.com.devd2.infra.ServiceException;
 import br.com.devd2.models.NaturezaContaEdicaoModel;
 import br.com.devd2.models.NaturezaContaModel;
+import io.quarkus.runtime.util.StringUtil;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -21,25 +23,28 @@ public class NaturezaContaService {
     /**
      * Lista totas as naturezas de contas ativas.
      * @param hasAtivas - Flag que indica listar apenas ATIVAS.
-     * @return
+     * @return Lista de naturezas da conta ativas.
      */
-    public List<NaturezaContaModel> listarNaturezasContas(boolean hasAtivas) 
+    public List<NaturezaContaModel> listarNaturezasContas(boolean hasAtivas, String idUsuario) 
     {
 
-        Stream<NaturezaContaEntity> lista = NaturezaContaEntity
-            .find("codigoTipoSituacaoNaturezaConta = ?1", TipoSituacaoEnum.Ativo.getCodigo()).stream();
-        return lista.map(m -> MapperHelper.INSTANCE.toNaturezaContaModel(m)).collect(Collectors.toList());
+        Stream<NaturezaContaEntity> lista = hasAtivas ?
+                NaturezaContaEntity.find("codigoTipoSituacaoNaturezaConta = ?1 and idUsuario = ?2", TipoSituacaoEnum.Ativo.getCodigo(), idUsuario).stream() :
+                NaturezaContaEntity.find("idUsuario = ?1", idUsuario).stream();
+
+        return lista.map(MapperHelper.INSTANCE::toNaturezaContaModel).collect(Collectors.toList());
 
     }
 
     /**
      * Recuperar natureza da conta pelo ID.
      * @param id - Identificador da natureza da conta.
-     * @return
+     * @return natureza da conta recuperada pelo ID, se encontrar.
      */
-    public NaturezaContaModel obterNaturezaConta(long id) {
+    public NaturezaContaModel obterNaturezaConta(String id, String idUsuario) throws ServiceException {
 
-        NaturezaContaEntity entity = NaturezaContaEntity.findById(id);
+        NaturezaContaEntity entity = NaturezaContaEntity.find("{ '_id': ?1, 'idUsuario': ?2 }", oid(id), idUsuario).firstResult();
+        if (entity == null) throw new ServiceException("Natureza de conta nao encontrada.");
         return MapperHelper.INSTANCE.toNaturezaContaModel(entity);
         
     }
@@ -47,19 +52,19 @@ public class NaturezaContaService {
     /**
      * Registrar uma nova natureza de conta.
      * @param naturezaConta - Natureza da conta para registro.
-     * @return
-     * @throws ServiceException 
+     * @return objeto de natureza da conta registrado.
+     * @throws ServiceException erro de negocio.
      */
-    public NaturezaContaModel registrarNaturezaConta(NaturezaContaEdicaoModel naturezaConta) throws ServiceException {
+    public NaturezaContaModel registrarNaturezaConta(NaturezaContaEdicaoModel naturezaConta, String idUsuario) throws ServiceException {
 
-        verificarRegrasNegocio(naturezaConta);
+        verificarRegrasNegocio(naturezaConta, idUsuario);
 
         var entity = MapperHelper.INSTANCE.toNaturezaContaEntity(naturezaConta);
+        entity.idUsuario = idUsuario;
         entity.codigoTipoSituacaoNaturezaConta = TipoSituacaoEnum.Ativo.getCodigo(); //Ativa
-        entity.persist();
+        entity.salvar();
 
-        var model = MapperHelper.INSTANCE.toNaturezaContaModel(entity);
-        return model;
+        return MapperHelper.INSTANCE.toNaturezaContaModel(entity);
         
     }
 
@@ -67,18 +72,17 @@ public class NaturezaContaService {
      * Alteração das informações de uma natureza de conta pelo seu ID.
      * @param id - identificador da natureza de conta.
      * @param naturezaConta - informações para alteração da natureza.
-     * @return
-     * @throws ServiceException 
+     * @return objeto com as informações da naturea alterada.
+     * @throws ServiceException erro de negocio.
      */
-    public NaturezaContaModel alterarNaturezaConta(long id, NaturezaContaEdicaoModel naturezaConta) throws ServiceException {
+    public NaturezaContaModel alterarNaturezaConta(String id, NaturezaContaEdicaoModel naturezaConta, String idUsuario) throws ServiceException {
 
-        NaturezaContaEntity entity = NaturezaContaEntity.findById(id);
+        NaturezaContaEntity entity = NaturezaContaEntity.find("{ '_id': ?1, 'idUsuario': ?2 }", oid(id), idUsuario).firstResult();
         if (entity == null) {
-            throw new ServiceException("Natureza da conta não identificada pelo ID %s.".formatted(id));
+            throw new ServiceException("Natureza da conta não identificada pelo ID: %s.".formatted(id));
         }
         
         //Atualizar a entity com base nas informações enviadas para atualização...
-
         if (naturezaConta.codigoTipoLancamentoConta != 0) {
             if (!TipoLancamentoEnum.hasTipoLancamento(naturezaConta.codigoTipoLancamentoConta)) {
                 throw new ServiceException("Tipo lançamento (%s) não existente.".formatted(naturezaConta.codigoTipoLancamentoConta));
@@ -86,32 +90,41 @@ public class NaturezaContaService {
             entity.codigoTipoLancamentoConta = naturezaConta.codigoTipoLancamentoConta;
         }
 
-        if (naturezaConta.descricaoNaturezaConta != null && !naturezaConta.descricaoNaturezaConta.trim().isEmpty()) {
-            entity.descricaoNaturezaConta = naturezaConta.descricaoNaturezaConta;
-        }
-        
-        entity.persist();
+        if (!StringUtil.isNullOrEmpty(naturezaConta.nomeNaturezaConta))
+            entity.nomeNaturezaConta = naturezaConta.nomeNaturezaConta;
 
-        var model = MapperHelper.INSTANCE.toNaturezaContaModel(entity);
-        return model;
+        if (!StringUtil.isNullOrEmpty(naturezaConta.descricaoNaturezaConta))
+            entity.descricaoNaturezaConta = naturezaConta.descricaoNaturezaConta;
+
+        entity.salvar();
+
+        return MapperHelper.INSTANCE.toNaturezaContaModel(entity);
         
     }
 
     /**
      * Verifica se para registro e alteração da natureza de conta, todas as regras foram atendidas.
      * @param natureza - Objeto para verificação;
-     * @throws ServiceException 
+     * @throws ServiceException erro de negocio
      */
-    private void verificarRegrasNegocio(NaturezaContaEdicaoModel natureza) throws ServiceException {
+    private void verificarRegrasNegocio(NaturezaContaEdicaoModel natureza, String idUsuario) throws ServiceException {
         
-        if (natureza == null) {
+        if (natureza == null)
             throw new ServiceException("Natureza de conta informada nula.");
-        }
-        if (natureza.descricaoNaturezaConta == null || natureza.descricaoNaturezaConta.trim().isEmpty()) {
+        if (StringUtil.isNullOrEmpty(natureza.nomeNaturezaConta))
             throw new ServiceException("Descrição da natureza de conta não informada");
-        }
-        if (!TipoLancamentoEnum.hasTipoLancamento(natureza.codigoTipoLancamentoConta)) {
+        if (StringUtil.isNullOrEmpty(natureza.descricaoNaturezaConta))
+            throw new ServiceException("Descrição da natureza de conta não informada");
+        if (!TipoLancamentoEnum.hasTipoLancamento(natureza.codigoTipoLancamentoConta))
             throw new ServiceException("Tipo de lançamento inválido ou não informado.");
+
+        //Verificar se a natureza já existe com o mesmo nome
+        Optional<NaturezaContaEntity> naturezaExistente = NaturezaContaEntity.find("nomeNaturezaConta = ?1 and idUsuario = ?2",
+                natureza.nomeNaturezaConta.trim(), idUsuario).firstResultOptional();
+        if (naturezaExistente.isPresent()) {
+            var entityNaturezaConta = naturezaExistente.get();
+            throw new ServiceException("Nome de natureza de conta (%s) já existente como o ID: %s."
+                    .formatted(entityNaturezaConta.nomeNaturezaConta, entityNaturezaConta.id));
         }
 
     }
@@ -120,12 +133,11 @@ public class NaturezaContaService {
      * Exclusão de uma natureza de conta pelo seu ID, pode ser lógica, ser existir algum vínculo com a natureza, 
      * caso não existe vínculo será uma exclusão física mesmo.
      * @param id - identificador da natureza de conta.
-     * @return
-     * @throws ServiceException 
+     * @throws ServiceException erro de negocio.
      */
-    public void excluirNaturezaConta(long id) throws ServiceException {
+    public void excluirNaturezaConta(String id, String idUsuario) throws ServiceException {
 
-        NaturezaContaEntity entity = NaturezaContaEntity.findById(id);
+        NaturezaContaEntity entity = NaturezaContaEntity.find("{ '_id': ?1, 'idUsuario': ?2 }", oid(id), idUsuario).firstResult();
         if (entity == null)
             throw new ServiceException("Natureza de conta não identificada pelo ID %s.".formatted(id));
 
@@ -133,7 +145,7 @@ public class NaturezaContaService {
         var hasExclusaoFisica = verificarVinculosNaturezaConta(entity);
         if (hasExclusaoFisica) {
             entity.codigoTipoSituacaoNaturezaConta = TipoSituacaoEnum.Inativo.getCodigo();
-            entity.persist();
+            entity.salvar();
         } else {
             entity.delete();
         }
@@ -141,10 +153,10 @@ public class NaturezaContaService {
     }
 
     /**
-     * Verifica se existem vínculos com a natureza de conta.
+     * Verifica se existem vínculos com a natureza de conta nas Despesas e Receitas.
      * @param naturezaConta - Natureza de conta carregada.
-     * @return
-     * @throws ServiceException 
+     * @return true existe vincula, false não existe nenhum.
+     * @throws ServiceException erro de negócio se identificar.
      */
     private boolean verificarVinculosNaturezaConta(NaturezaContaEntity naturezaConta) throws ServiceException {
         
@@ -153,15 +165,25 @@ public class NaturezaContaService {
         }
         
         //Verificar se existe vinculo com as despesas...
-        var countDespesas = DespesaFixaEntity.count("idNaturezaContaDespesaFixa = ?1", naturezaConta.id);
-        if (countDespesas > 0) {
-            return true;
+        if (naturezaConta.codigoTipoLancamentoConta == TipoLancamentoEnum.Despesa.getCodigo()) {
+            var countDespesas = DespesaFixaEntity.count("idNaturezaContaDespesaFixa = ?1 and idUsuario = ?2", naturezaConta.id.toHexString(), naturezaConta.idUsuario);
+            if (countDespesas > 0)
+                return true;
+            countDespesas = DespesaMensalEntity.count("idNaturezaContaDespesa = ?1 and idUsuario = ?2", naturezaConta.id.toHexString(), naturezaConta.idUsuario);
+            if (countDespesas > 0)
+                return true;
         }
-        countDespesas = DespesaMensalEntity.count("idNaturezaContaDespesa = ?1", naturezaConta.id);
-        if (countDespesas > 0) {
-            return true;
+
+        //Verificar se existe vinculo com as receitas...
+        if (naturezaConta.codigoTipoLancamentoConta == TipoLancamentoEnum.Receita.getCodigo()) {
+            var countReceitas = ReceitaFixaEntity.count("idNaturezaContaReceitaFixa = ?1 and idUsuario = ?2", naturezaConta.id.toHexString(), naturezaConta.idUsuario);
+            if (countReceitas > 0)
+                return true;
+            countReceitas = ReceitaMensalEntity.count("idNaturezaContaReceita = ?1 and idUsuario = ?2", naturezaConta.id.toHexString(), naturezaConta.idUsuario);
+            if (countReceitas > 0)
+                return true;
         }
-        
+
         return false;
 
     }
