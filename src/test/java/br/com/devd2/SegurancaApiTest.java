@@ -29,4 +29,16 @@ class SegurancaApiTest {
                 .body("paths.'/api/v1/usuarios'.post.security", anyOf(nullValue(), empty()))
                 .body("paths.'/api/v1/usuarios'.get.security[0].bearerAuth", notNullValue());
     }
+    @Test void openApiDocumentaRespostasReais() {
+        var json = given().accept("application/json").get("/q/openapi?format=json").then().statusCode(200).extract().jsonPath();
+        org.assertj.core.api.Assertions.assertThat((Object) json.get("components.schemas.NaturezaContaModel.properties.nomeNaturezaConta")).isNotNull();
+        for (String path : new String[]{"/api/v1/natureza-conta", "/api/v1/formas-lancamento", "/api/v1/despesas/fixas", "/api/v1/despesas/mensais", "/api/v1/receitas/fixas", "/api/v1/receitas/mensais"}) {
+            org.assertj.core.api.Assertions.assertThat((Object) json.get("paths.'" + path + "'.get.responses.'200'.content.'application/json'.schema")).isNotNull();
+        }
+        org.assertj.core.api.Assertions.assertThat((Object) json.get("paths.'/api/v1/auth/login'.post.responses.'200'.content.'application/json'.schema")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat((String) json.get("paths.'/api/v1/despesas/mensais'.post.responses.'200'.content.'application/json'.schema.type")).isEqualTo("array");
+        org.assertj.core.api.Assertions.assertThat((Object) json.get("paths.'/api/v1/despesas/mensais'.post.responses.'200'.content.'application/json'.schema.items")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat((Object) json.get("components.schemas.DespesaMensalModel.properties.hasDespesaLiquidada")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat((Object) json.get("components.schemas.ReceitaMensalModel.properties.isReceitaLiquidada")).isNotNull();
+    }
 }

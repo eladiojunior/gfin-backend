@@ -149,7 +149,7 @@ class MongoPersistenceTest {
     }
 
     public static class IsolatedMongo implements QuarkusTestResourceLifecycleManager {
-        private final String database = "gfin_test_" + UUID.randomUUID().toString().replace("-", "");
+        private final String database = System.getenv("GFIN_TEST_MONGODB_URI") == null ? "gfin_test" : "gfin_test_" + UUID.randomUUID().toString().replace("-", "");
         private MongoServer server;
         private String uri;
         @Override public Map<String, String> start() {

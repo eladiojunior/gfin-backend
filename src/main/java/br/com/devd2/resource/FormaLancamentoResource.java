@@ -2,6 +2,10 @@ package br.com.devd2.resource;
 
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import br.com.devd2.models.*;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -48,7 +52,7 @@ public class FormaLancamentoResource {
     }
 
     @GET
-    @APIResponse(responseCode = "200", description = "Lista as formas de lançamento.")
+    @APIResponse(responseCode = "200", description = "Lista as formas de lançamento.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.ARRAY, implementation = FormaLancamentoModel.class)))
     @Operation(summary = "Listar formas de lançamento", description = "Lista as formas do usuário autenticado.")
     public Response listar() {
         try {
@@ -61,7 +65,7 @@ public class FormaLancamentoResource {
 
     @GET
     @Path("/{id}")
-    @APIResponse(responseCode = "200", description = "Forma de lançamento recuperada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Forma de lançamento recuperada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FormaLancamentoModel.class)))
     @APIResponse(responseCode = "400", description = "Forma de lançamento não encontrada ou identificador inválido.")
     @Operation(summary = "Obter forma de lançamento", description = "Recupera uma forma do usuário autenticado pelo ID.")
     public Response obter(@PathParam("id") String id) {
@@ -78,7 +82,7 @@ public class FormaLancamentoResource {
     }
 
     @POST
-    @APIResponse(responseCode = "200", description = "Forma de lançamento registrada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Forma de lançamento registrada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FormaLancamentoModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @Operation(summary = "Registrar forma de lançamento", description = "Cria uma forma para o usuário autenticado.")
     public Response criar(FormaLancamentoModel model) {
@@ -96,7 +100,7 @@ public class FormaLancamentoResource {
 
     @PUT
     @Path("/{id}")
-    @APIResponse(responseCode = "200", description = "Forma de lançamento alterada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Forma de lançamento alterada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FormaLancamentoModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @Operation(summary = "Alterar forma de lançamento", description = "Atualiza uma forma do usuário autenticado.")
     public Response alterar(@PathParam("id") String id, FormaLancamentoModel model) {

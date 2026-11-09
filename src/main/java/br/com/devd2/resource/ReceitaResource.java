@@ -1,6 +1,10 @@
 package br.com.devd2.resource;
 
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import br.com.devd2.models.*;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -37,6 +41,8 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 @Tag(name = "Receitas", description = "Operações de receitas fixas e mensais do gerenciador financeiro.")
 public class ReceitaResource {
 
+    @Inject br.com.devd2.services.EstornoService estornoService;
+
     private final Logger log = LoggerFactory.getLogger(ReceitaResource.class);
 
     @Inject
@@ -55,7 +61,7 @@ public class ReceitaResource {
 
     @GET
     @Path("/fixas")
-    @APIResponse(responseCode = "200", description = "Lista as receitas fixas ativas.")
+    @APIResponse(responseCode = "200", description = "Lista as receitas fixas ativas.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.ARRAY, implementation = ReceitaFixaModel.class)))
     @Operation(summary = "Listar receitas fixas", description = "Lista as receitas fixas ativas do usuário autenticado.")
     public Response listar_receitas_fixas() {
         try {
@@ -69,7 +75,7 @@ public class ReceitaResource {
 
     @GET
     @Path("/fixas/{id}")
-    @APIResponse(responseCode = "200", description = "Receita fixa recuperada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita fixa recuperada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaFixaModel.class)))
     @APIResponse(responseCode = "400", description = "Receita fixa não encontrada.")
     @Operation(summary = "Obter receita fixa", description = "Recupera uma receita fixa pelo seu ID.")
     public Response obter_receita_fixa(@PathParam("id") String id) {
@@ -86,7 +92,7 @@ public class ReceitaResource {
 
     @POST
     @Path("/fixas")
-    @APIResponse(responseCode = "200", description = "Receita fixa registrada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita fixa registrada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaFixaModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @APIResponse(responseCode = "500", description = "Erro ao registrar receita fixa.")
     @Operation(summary = "Registrar receita fixa", description = "Cria uma nova receita fixa. Um histórico de valor é criado automaticamente.")
@@ -105,7 +111,7 @@ public class ReceitaResource {
 
     @PUT
     @Path("/fixas/{id}")
-    @APIResponse(responseCode = "200", description = "Receita fixa alterada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita fixa alterada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaFixaModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @APIResponse(responseCode = "500", description = "Erro ao alterar receita fixa.")
     @Operation(summary = "Alterar receita fixa", description = "Edita uma receita fixa pelo seu ID. Passe hasGravarHistorico=true para registrar histórico de valor.")
@@ -149,7 +155,7 @@ public class ReceitaResource {
 
     @GET
     @Path("/mensais")
-    @APIResponse(responseCode = "200", description = "Lista as receitas mensais do período.")
+    @APIResponse(responseCode = "200", description = "Lista as receitas mensais do período.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.ARRAY, implementation = ReceitaMensalModel.class)))
     @Operation(summary = "Listar receitas mensais", description = "Lista as receitas do mês/ano informados do usuário autenticado.")
     public Response listar_receitas_mensais(
             @QueryParam("mes") int mes,
@@ -165,7 +171,7 @@ public class ReceitaResource {
 
     @GET
     @Path("/mensais/{id}")
-    @APIResponse(responseCode = "200", description = "Receita mensal recuperada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita mensal recuperada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaMensalModel.class)))
     @APIResponse(responseCode = "400", description = "Receita mensal não encontrada.")
     @Operation(summary = "Obter receita mensal", description = "Recupera uma receita mensal pelo seu ID.")
     public Response obter_receita_mensal(@PathParam("id") String id) {
@@ -182,7 +188,7 @@ public class ReceitaResource {
 
     @POST
     @Path("/mensais")
-    @APIResponse(responseCode = "200", description = "Receita mensal registrada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita mensal registrada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaMensalModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @APIResponse(responseCode = "500", description = "Erro ao registrar receita mensal.")
     @Operation(summary = "Registrar receita mensal", description = "Cria uma nova receita mensal.")
@@ -201,7 +207,7 @@ public class ReceitaResource {
 
     @PUT
     @Path("/mensais/{id}")
-    @APIResponse(responseCode = "200", description = "Receita mensal alterada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita mensal alterada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaMensalModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida.")
     @APIResponse(responseCode = "500", description = "Erro ao alterar receita mensal.")
     @Operation(summary = "Alterar receita mensal", description = "Atualiza dados de uma receita mensal não liquidada.")
@@ -220,7 +226,7 @@ public class ReceitaResource {
 
     @POST
     @Path("/mensais/{id}/liquidar")
-    @APIResponse(responseCode = "200", description = "Receita mensal liquidada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Receita mensal liquidada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaMensalModel.class)))
     @APIResponse(responseCode = "400", description = "Receita já liquidada ou dados inválidos.")
     @APIResponse(responseCode = "500", description = "Erro ao liquidar receita mensal.")
     @Operation(summary = "Liquidar receita mensal", description = "Registra a liquidação (recebimento) de uma receita mensal.")
@@ -253,6 +259,43 @@ public class ReceitaResource {
             return Response.status(Status.BAD_REQUEST).entity("Identificador invalido").build();
         } catch (Exception erro) {
             log.error("Erro ao excluir receita mensal.", erro);
+            return Response.serverError().entity(ResultApiHelper.toResponseErro(erro)).build();
+        }
+    }
+    @POST
+    @Path("/mensais/{id}/estornar")
+    @Consumes(MediaType.WILDCARD)
+    @APIResponse(responseCode = "200", description = "Liquidação estornada; lançamento pendente.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ReceitaMensalModel.class)))
+    @APIResponse(responseCode = "400", description = "Lançamento inexistente, pendente ou alterado simultaneamente.")
+    @Operation(summary = "Estornar liquidação", description = "Retorna o lançamento ao estado pendente e preserva a liquidação no histórico de estornos.")
+    public Response estornarMensal(@PathParam("id") String id) {
+        try {
+            estornoService.estornar(id, idUsuarioLogado(), false);
+            return Response.ok(receitaService.obterReceitaMensal(id, idUsuarioLogado())).build();
+        } catch (ServiceException regra) {
+            return Response.status(Status.BAD_REQUEST).entity(ResultApiHelper.toResponseRegra(regra)).build();
+        } catch (jakarta.ws.rs.BadRequestException erro) {
+            return Response.status(Status.BAD_REQUEST).entity("Identificador invalido").build();
+        } catch (Exception erro) {
+            log.error("Erro ao estornar lançamento.", erro);
+            return Response.serverError().entity(ResultApiHelper.toResponseErro(erro)).build();
+        }
+    }
+
+    @GET
+    @Path("/mensais/{id}/historico-estornos")
+    @APIResponse(responseCode = "200", description = "Histórico de liquidações estornadas, em ordem de registro.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.ARRAY, implementation = br.com.devd2.models.HistoricoEstornoModel.class)))
+    @APIResponse(responseCode = "400", description = "Lançamento não encontrado.")
+    @Operation(summary = "Consultar histórico de estornos", description = "Retorna os dados das liquidações estornadas do lançamento do usuário autenticado.")
+    public Response historicoEstornos(@PathParam("id") String id) {
+        try {
+            return Response.ok(estornoService.historico(id, idUsuarioLogado(), false)).build();
+        } catch (ServiceException regra) {
+            return Response.status(Status.BAD_REQUEST).entity(ResultApiHelper.toResponseRegra(regra)).build();
+        } catch (jakarta.ws.rs.BadRequestException erro) {
+            return Response.status(Status.BAD_REQUEST).entity("Identificador invalido").build();
+        } catch (Exception erro) {
+            log.error("Erro ao consultar histórico de estornos.", erro);
             return Response.serverError().entity(ResultApiHelper.toResponseErro(erro)).build();
         }
     }

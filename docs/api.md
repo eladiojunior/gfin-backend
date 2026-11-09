@@ -21,3 +21,11 @@ Em geral, sucesso retorna 200, inclusive criação e exclusão; `ServiceExceptio
 As operações autenticadas usam o subject do JWT como ID do proprietário. Listagens, consultas por ID, alterações, liquidações e exclusões são limitadas ao usuário; uma referência a documento de outro usuário é rejeitada. `GET /usuarios` retorna somente o usuário autenticado.
 
 Formas de lançamento são particulares por usuário: `codigoLancamentoConta` é 1 (despesa) ou 2 (receita), `codigoSituacaoFormaLancamento` é 1 (ativa) ou 2 (inativa). O cadastro exige nome, tipo e situação. Lançamentos e liquidações usam `idFormaLancamento` em vez dos antigos códigos dos enums; uma forma precisa estar ativa, ser do tipo correto e pertencer ao usuário. Exclusão de forma vinculada a lançamentos a inativa.
+
+Na criação de despesa mensal, `valorDespesa` é o valor total, com até duas casas decimais; quando há parcelas, o total é dividido em centavos e o restante fica na última. Valores já registrados não são alterados.
+
+## Estorno de liquidação
+
+`POST /api/v1/despesas/mensais/{id}/estornar` e `POST /api/v1/receitas/mensais/{id}/estornar` não exigem corpo e retornam o lançamento atualizado com status 200. É preciso estar autenticado e ser proprietário; lançamento inexistente, de outro usuário, pendente ou alterado concorrentemente resulta em 400. Repetir o estorno de um lançamento pendente não cria outro histórico.
+
+O frontend consulta `GET /api/v1/despesas/mensais/{id}/historico-estornos` ou `GET /api/v1/receitas/mensais/{id}/historico-estornos`; a resposta é uma lista, vazia se não houver estornos. Cada item contém `dataHoraEstorno`, `dataHoraLiquidacao` (UTC ISO-8601), `idFormaLancamento`, `codigoVinculoFormaLiquidacao`, `valorTotalLiquidacao`, `valorDescontoLiquidacao` e `valorMultaJurosLiquidacao`, quando disponíveis. O histórico é armazenado no lançamento, juntamente com a mudança para pendente. O lançamento conserva forma e vínculo; os campos da liquidação corrente são limpos. Exclusão física de lançamento com histórico de estorno é bloqueada.

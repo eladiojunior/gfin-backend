@@ -1,6 +1,10 @@
 package br.com.devd2.resource;
 
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import br.com.devd2.models.*;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -43,7 +47,7 @@ public class NaturezaContaResource {
     private String idUsuarioLogado() { return jwt.getSubject(); }
 
     @GET
-    @APIResponse(responseCode = "200", description = "Lista as naturezas de contas (ativas) existentes.")
+    @APIResponse(responseCode = "200", description = "Lista as naturezas de contas (ativas) existentes.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = SchemaType.ARRAY, implementation = NaturezaContaModel.class)))
     @APIResponse(responseCode = "500", description = "Erro ao listar as naturezas de contas (ativas) existentes.")
     @Operation(summary = "Listar Naturezas de Conta", description = "Lista as naturezas de contas ativas, caso não exista será retornado uma lista vazia.")
     public Response listar_natureza() {
@@ -65,7 +69,7 @@ public class NaturezaContaResource {
 
     @GET
     @Path("/{id}")
-    @APIResponse(responseCode = "200", description = "Natureza de conta, pelo ID, recuperada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Natureza de conta, pelo ID, recuperada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = NaturezaContaModel.class)))
     @APIResponse(responseCode = "500", description = "Erro ao recuperar uma natureza de conta pelo ID.")
     @Operation(summary = "Recuperar Natureza de Conta", description = "Recupera uma natureza de conta pelo seu ID, caso não exista será retornado um objeto vazio.")
     public Response obter_natureza(@PathParam("id") String id) {
@@ -88,7 +92,7 @@ public class NaturezaContaResource {
     }
     
     @POST
-    @APIResponse(responseCode = "200", description = "Despesa fixa reistrada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Despesa fixa reistrada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = NaturezaContaModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida para registro de nova despesa fixa.")
     @APIResponse(responseCode = "500", description = "Erro ao registrar nova despesa fixa.")
     @Operation(summary = "Registar Natureza de Conta", description = "Registra uma nova natureza de conta.")
@@ -116,7 +120,7 @@ public class NaturezaContaResource {
 
     @PUT
     @Path("/{id}")
-    @APIResponse(responseCode = "200", description = "Natureza de conta alterada com sucesso.")
+    @APIResponse(responseCode = "200", description = "Natureza de conta alterada com sucesso.", content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = NaturezaContaModel.class)))
     @APIResponse(responseCode = "400", description = "Regra de negócio não atendida para alterar natureza de conta.")
     @APIResponse(responseCode = "500", description = "Erro ao alterar natureza de conta.")
     @Operation(summary = "Alterar Natureza de Conta", description = "Edita uma natureza de conta pelo ID.")

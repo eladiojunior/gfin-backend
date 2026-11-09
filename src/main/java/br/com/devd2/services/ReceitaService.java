@@ -24,6 +24,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class ReceitaService {
     @jakarta.inject.Inject FormaLancamentoService formas;
+    @jakarta.inject.Inject EstornoService estornos;
     @jakarta.inject.Inject ProcessamentoRecorrenteService processamentoRecorrente;
 
     // -------------------------------------------------------------------------
@@ -176,7 +177,7 @@ public class ReceitaService {
             entity.idFormaLancamento = model.idFormaLancamento;
         }
 
-        entity.salvar();
+        estornos.atualizarReceita(entity);
         return MapperHelper.INSTANCE.toReceitaMensalModel(entity);
     }
 
@@ -190,15 +191,9 @@ public class ReceitaService {
         }
         formas.validar(liquidacao.idFormaLancamento, idUsuario, 2);
 
-        entity.isReceitaLiquidada = true;
-        entity.dataHoraLiquidacaoReceita = LocalDateTime.now();
-        entity.idFormaLancamento = liquidacao.idFormaLancamento;
-        entity.valorTotalLiquidacaoReceita = liquidacao.valorTotal > 0
-            ? BigDecimal.valueOf(liquidacao.valorTotal)
-            : entity.valorReceita;
-
-        entity.salvar();
-        return MapperHelper.INSTANCE.toReceitaMensalModel(entity);
+        BigDecimal total = liquidacao.valorTotal > 0 ? BigDecimal.valueOf(liquidacao.valorTotal) : entity.valorReceita;
+        estornos.liquidarReceita(id, idUsuario, liquidacao.idFormaLancamento, total);
+        return obterReceitaMensal(id, idUsuario);
     }
 
     public void excluirReceitaMensal(String id, String idUsuario) throws ServiceException {
@@ -209,7 +204,7 @@ public class ReceitaService {
         if (entity.isReceitaLiquidada) {
             throw new ServiceException("Receita mensal (ID: %s) já liquidada não pode ser excluída.".formatted(id));
         }
-        entity.delete();
+        estornos.excluirPendente(id, idUsuario, false);
     }
 
     // -------------------------------------------------------------------------

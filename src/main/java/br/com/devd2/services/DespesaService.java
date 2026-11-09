@@ -27,6 +27,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class DespesaService {
     @jakarta.inject.Inject FormaLancamentoService formas;
+    @jakarta.inject.Inject EstornoService estornos;
     @jakarta.inject.Inject ProcessamentoRecorrenteService processamentoRecorrente;
 
     // -------------------------------------------------------------------------
@@ -162,6 +163,18 @@ public class DespesaService {
 
         int numeroParcelas = model.numeroParcelas <= 1 ? 1 : model.numeroParcelas;
         boolean isParcelada = numeroParcelas > 1;
+        BigDecimal total;
+        try {
+            total = BigDecimal.valueOf(model.valorDespesa).setScale(2, java.math.RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException | NumberFormatException erro) {
+            throw new ServiceException("Valor da despesa deve ter no máximo duas casas decimais.");
+        }
+        BigDecimal valorParcela;
+        // Divide centavos inteiros, não unidades monetárias inteiras.
+        java.math.BigInteger centavos = total.movePointRight(2).toBigIntegerExact();
+        java.math.BigInteger[] divisao = centavos.divideAndRemainder(java.math.BigInteger.valueOf(numeroParcelas));
+        valorParcela = new BigDecimal(divisao[0], 2);
+        BigDecimal valorUltimaParcela = new BigDecimal(divisao[0].add(divisao[1]), 2);
 
         // Código único para agrupar as parcelas
         Integer codigoParcelado = isParcelada ? (int) (System.currentTimeMillis() / 1000) : null;
@@ -180,7 +193,7 @@ public class DespesaService {
                 ? "%s (%d/%d)".formatted(model.descricaoDespesa, i, numeroParcelas)
                 : model.descricaoDespesa;
             entity.dataVencimentoDespesa = dataBase.plusMonths(i - 1);
-            entity.valorDespesa = BigDecimal.valueOf(model.valorDespesa);
+            entity.valorDespesa = i == numeroParcelas ? valorUltimaParcela : valorParcela;
             entity.idFormaLancamento = model.idFormaLancamento;
             entity.codigoVinculoFormaLiquidacao = model.codigoVinculoFormaLiquidacao;
             entity.textoObservacaoDespesa = model.textoObservacaoDespesa;
@@ -226,7 +239,7 @@ public class DespesaService {
         verificarVinculo(entity.idFormaLancamento, model.codigoVinculoFormaLiquidacao, idUsuario);
         entity.codigoVinculoFormaLiquidacao = model.codigoVinculoFormaLiquidacao;
 
-        entity.salvar();
+        estornos.atualizarDespesa(entity);
         return MapperHelper.INSTANCE.toDespesaMensalModel(entity);
     }
 
@@ -241,19 +254,10 @@ public class DespesaService {
         formas.validar(liquidacao.idFormaLancamento, idUsuario, 1);
 
         verificarVinculo(liquidacao.idFormaLancamento, liquidacao.codigoVinculoFormaLiquidacao, idUsuario);
-        entity.hasDespesaLiquidada = true;
-        entity.dataHoraLiquidacaoDespesa = LocalDateTime.now();
-        entity.idFormaLancamento = liquidacao.idFormaLancamento;
-        entity.codigoVinculoFormaLiquidacao = liquidacao.codigoVinculoFormaLiquidacao;
-
         BigDecimal desconto = BigDecimal.valueOf(liquidacao.valorDesconto);
         BigDecimal multaJuros = BigDecimal.valueOf(liquidacao.valorMultaJuros);
-        entity.valorDescontoLiquidacaoDespesa = desconto;
-        entity.valorMultaJurosLiquidacaoDespesa = multaJuros;
-        entity.valorTotalLiquidacaoDespesa = entity.valorDespesa.subtract(desconto).add(multaJuros);
-
-        entity.salvar();
-        return MapperHelper.INSTANCE.toDespesaMensalModel(entity);
+        estornos.liquidarDespesa(id, idUsuario, liquidacao.idFormaLancamento, liquidacao.codigoVinculoFormaLiquidacao, desconto, multaJuros, entity.valorDespesa);
+        return obterDespesaMensal(id, idUsuario);
     }
 
     public void excluirDespesaMensal(String id, String idUsuario) throws ServiceException {
@@ -264,7 +268,7 @@ public class DespesaService {
         if (entity.hasDespesaLiquidada) {
             throw new ServiceException("Despesa mensal (ID: %s) já liquidada não pode ser excluída.".formatted(id));
         }
-        entity.delete();
+        estornos.excluirPendente(id, idUsuario, true);
     }
 
     // -------------------------------------------------------------------------

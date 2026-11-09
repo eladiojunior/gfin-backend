@@ -11,6 +11,10 @@ import jakarta.json.bind.annotation.JsonbDateFormat;
 @MongoEntity(collection = "tb_receita_mensal")
 public class ReceitaMensalEntity extends DocumentoBase {
 
+    public java.util.List<HistoricoEstornoEntity> historicoEstornos;
+
+    public String versaoLiquidacao;
+
     @BsonId
     public org.bson.types.ObjectId id;
 

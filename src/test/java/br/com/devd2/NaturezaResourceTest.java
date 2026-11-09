@@ -20,7 +20,8 @@ class NaturezaResourceTest {
         String body = "{\"nomeNaturezaConta\":\"Mercado\",\"descricaoNaturezaConta\":\"Alimentacao\",\"codigoTipoLancamentoConta\":1}";
         String id = given().auth().oauth2(token).contentType("application/json").body(body)
                 .post("/api/v1/natureza-conta").then().statusCode(200).extract().path("idNaturezaConta");
-        given().auth().oauth2(token).get("/api/v1/natureza-conta/" + id).then().statusCode(200).body("descricaoNaturezaConta", is("Alimentacao"));
+        given().auth().oauth2(token).get("/api/v1/natureza-conta/" + id).then().statusCode(200).body("descricaoNaturezaConta", is("Alimentacao")).body("nomeNaturezaConta", is("Mercado"));
+        given().auth().oauth2(token).get("/api/v1/natureza-conta").then().statusCode(200).body("[0].nomeNaturezaConta", is("Mercado"));
         given().auth().oauth2(tokenOutro).get("/api/v1/natureza-conta/" + id).then().statusCode(400);
         given().auth().oauth2(token).contentType("application/json").body("{\"descricaoNaturezaConta\":\"Compras\"}")
                 .put("/api/v1/natureza-conta/" + id).then().statusCode(200).body("descricaoNaturezaConta", is("Compras"));

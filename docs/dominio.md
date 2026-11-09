@@ -19,7 +19,7 @@ Os campos estão nas entities MongoDB. IDs escalares não criam chaves estrangei
 
 - Fixas ativas são listadas por usuário; sua criação registra histórico. A edição pode registrar novo histórico com `hasGravarHistorico=true`. Exclusão de fixa com lançamento mensal vinculado inativa; sem vínculo remove a fixa e seu histórico.
 - Receitas e despesas mensais são listadas pelo mês da data de recebimento ou vencimento e usuário. São criadas não liquidadas; uma vez liquidadas não podem ser alteradas, liquidadas novamente ou excluídas. Liquidação registra data/hora atual e forma; o total informado positivo é usado, senão usa o valor original.
-- Uma despesa mensal com `numeroParcelas > 1` gera N lançamentos, cada um com o valor informado, descrição numerada e vencimento incrementado mensalmente. O agrupador é calculado em segundos; não é garantia de unicidade. Não se divide o valor pelo número de parcelas.
+- Uma despesa mensal com `numeroParcelas > 1` gera N lançamentos, com o valor total dividido em centavos, restante na última parcela, descrição numerada e vencimento incrementado mensalmente. O agrupador é calculado em segundos; não é garantia de unicidade.
 - Naturezas exigem nome/descrição e tipo de lançamento válido; exclusão inativa se houver vínculos consultados, senão apaga. Lançamentos verificam existência e situação da natureza; confira validações exatas de cada operação no service.
 - Conta corrente com cartão vinculado não pode ser excluída. Cartão aceita conta opcional e validade `MM/yyyy`. Usuário excluído é inativado.
 
